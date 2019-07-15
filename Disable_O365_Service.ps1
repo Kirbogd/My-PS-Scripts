@@ -18,5 +18,5 @@ $licenseoption = New-MsolLicenseOptions -AccountSkuId $AccountSKU  -DisabledPlan
 # Disable the service for all users
 (Get-MsolUser -all) |where {(foreach {$_.licenses.servicestatus} | where {$_.serviceplan.servicename -eq $Plan}).ProvisioningStatus -in ("success","PendingProvisioning")} |Set-MsolUserLicense -LicenseOptions $licenseoption
 
-Find users who has the service in 
+# Find users who has the service in 
 (Get-MsolUser -all) |where {(foreach {$_.licenses.servicestatus} | where {$_.serviceplan.servicename -eq $Plan}).ProvisioningStatus -notin ("disabled",$null}
