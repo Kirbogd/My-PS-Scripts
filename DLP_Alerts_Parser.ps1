@@ -25,12 +25,13 @@ Just set
 ## The data can be found in App registration page in azure ad portal: 
 ## https://portal.azure.com/#blade/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/RegisteredApps
 
-$ClientID = "Set-clientID here"
-$TenantID = "Set tenantID here"
-$Secret = "App secret here"
+$ClientID = ""
+$TenantID = ""
+$Secret = ""
 
 
-function Get-AuthToken 
+
+function Get-AuthHeader 
     {
 
 
@@ -118,9 +119,6 @@ function Get-AuthToken
             )
 
         
-        $authority = "$authroot/$TenantID"
-        
-
         #region Initialize ADAL
         
             Write-Host "Checking for AzureAD module..."
@@ -158,8 +156,7 @@ function Get-AuthToken
         
             }
         
-        
-        
+              
             # Getting path to ActiveDirectory Assemblies
         
             # If the module count is greater than 1 find the latest version
@@ -220,352 +217,127 @@ function Get-AuthToken
     
         #endregion
         
+        $authority = "$authroot/$TenantID"
+
+        $authContext = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContext" -ArgumentList $authority
         
+        # https://msdn.microsoft.com/en-us/library/azure/microsoft.identitymodel.clients.activedirectory.promptbehavior.aspx
+                    
+        # Change the prompt behaviour to force credentials each time: Auto, Always, Never, RefreshSession
+                    
+        $platformParameters = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.PlatformParameters" -ArgumentList "Always"
+
+        try
+        { 
         
         ######### Switching auth method based on function switch
 
-        
-        
-        switch($PSCmdlet.ParameterSetName)
+            switch($PSCmdlet.ParameterSetName)
             {
-                "ByUser" 
-                { 
-                    try {
-        
-                            $authContext = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContext" -ArgumentList $authority
-                    
-                    
-                    
-                            # https://msdn.microsoft.com/en-us/library/azure/microsoft.identitymodel.clients.activedirectory.promptbehavior.aspx
-                    
-                            # Change the prompt behaviour to force credentials each time: Auto, Always, Never, RefreshSession
-                    
-                    
-                    
-                            $platformParameters = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.PlatformParameters" -ArgumentList "Always"
-                    
-                    
-                    
-                            $userId = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.UserIdentifier" -ArgumentList ($User, "OptionalDisplayableId")
-                    
-                    
-                    
-                            $authReturn = $authContext.AcquireTokenAsync($resourceAppIdURI,$clientId,$redirectUri,$platformParameters,$userId)
+                    "ByUser" 
+                    { 
+                        $userId = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.UserIdentifier" -ArgumentList ($User, "OptionalDisplayableId")
 
+                        $authReturn = $authContext.AcquireTokenAsync($resourceAppIdURI,$clientId,$redirectUri,$platformParameters,$userId)
 
-                            $authResult = $authReturn.Result
-                    
-                            # If the accesstoken is valid then create the authentication header
-                    
-                    
-                            if($authResult.AccessToken)
-                            {
-                    
-                                # Creating header for Authorization token
-                    
-                    
-                    
-                                $authHeader = @{
-                    
-                                'Content-Type'='application/json'
-                    
-                                'Authorization'="Bearer " + $authResult.AccessToken
-                    
-                                'ExpiresOn'=$authResult.ExpiresOn
-                    
-                                }
-                    
-                    
-                                return $authHeader
-                    
-                            }
-                    
-                    
-                            else 
-                            {
-                    
-                    
-                                Write-Host
-                    
-                                Write-Host "Authorization Access Token is null, please re-run authentication..." -ForegroundColor Red
-                                
-                                Write-Host
-                    
-                                break
-                    
-                            }
-                    
-                    
-                    
-                        }
-                    
-                                
-                    catch 
-                        {
-                                    
-                            write-host $_.Exception.Message -f Red
-                    
-                            write-host $_.Exception.ItemName -f Red
-                    
-                            write-host
-                    
-                            break
-                    
-                        }
-                    
-                    
-                }
-                "ByCert" 
-                {
-                    $clientCertificate = Get-Item -Path Cert:\CurrentUser\My\$CertThumbprint
+                    }
 
-                    try 
+                    "ByCert" 
                     {
-        
-        
-                        $authContext = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContext" -ArgumentList $authority
-                    
-                    
-                        # https://msdn.microsoft.com/en-us/library/azure/microsoft.identitymodel.clients.activedirectory.promptbehavior.aspx
-                    
-                        # Change the prompt behaviour to force credentials each time: Auto, Always, Never, RefreshSession
-                    
-                
-                        $platformParameters = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.PlatformParameters" -ArgumentList "Always"
-                    
-                    
+                        $clientCertificate = Get-Item -Path Cert:\CurrentUser\My\$CertThumbprint
+
                         $ClientCred = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.ClientAssertionCertificate" -ArgumentList ($ClientId, $clientCertificate)
                     
-                        
-                    
                         $authReturn = $authContext.AcquireTokenAsync($resourceAppIdURI,$ClientCred)
-                    
                         
-                        $authResult = $authReturn.Result
-                    
-                            # If the accesstoken is valid then create the authentication header
-                    
-                    
-                    
-                            if($authResult.AccessToken)
-                            {
-                    
-                                # Creating header for Authorization token
-                    
-                                $authHeader = @{
-                    
-                                'Content-Type'='application/json'
-                    
-                                'Authorization'="Bearer " + $authResult.AccessToken
-                    
-                                'ExpiresOn'=$authResult.ExpiresOn
-                    
-                                }
-                    
-                    
-                                return $authHeader
-                    
-                    
-                    
-                            }
-                    
-                    
-                    
-                            else 
-                            {
-                    
-                    
-                    
-                                Write-Host
-                    
-                                Write-Host "Authorization Access Token is null, please re-run authentication..." -ForegroundColor Red
-                    
-                                Write-Host
-                    
-                                break
-                    
-                    
-                            }
-                    
-                    
                     }
                     
-                    
-                    
-                    catch 
+                    "BySecret" 
                     {
-                    
-                    
-                    
-                        write-host $_.Exception.Message -f Red
-                    
-                        write-host $_.Exception.ItemName -f Red
-                    
-                        write-host
-                    
-                        break
-                    
-                    
-                    
-                    }
-                    
-                    
-                    
-                    
-                }
-                "BySecret" 
-                {
-                    try 
-                    {
-        
-        
-        
-                        $authContext = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContext" -ArgumentList $authority
-                    
-                    
                         $ClientCred = New-Object "Microsoft.IdentityModel.Clients.ActiveDirectory.ClientCredential" -ArgumentList ($clientId, $Secret)
-                    
-                    
+                        
                         $authReturn = $authContext.AcquireTokenAsync($resourceAppIdURI,$ClientCred)
-                    
-                        $authResult = $authReturn.Result
-                    
-                        # If the accesstoken is valid then create the authentication header
-                    
-                    
-                    
-                        if($authResult.AccessToken)
-                        {
-                    
-                    
-                    
-                            # Creating header for Authorization token
-                    
-                    
-                    
-                            $authHeader = @{
-                    
-                                'Content-Type'='application/json'
-                    
-                                'Authorization'="Bearer " + $authResult.AccessToken
-                    
-                                'ExpiresOn'=$authResult.ExpiresOn
-                    
-                                }
-                    
-                    
-                    
-                            return $authHeader
-                    
-                    
-                    
-                        }
-                    
-                    
-                    
-                        else 
-                        {     
-                    
-                            Write-Host
-                    
-                            Write-Host "Authorization Access Token is null, please re-run authentication..." -ForegroundColor Red
-                    
-                            Write-Host
-                    
-                            break
-                    
-                        }
-                    
-                    
-                    
+                        
                     }
-                    
-                    
-                    
-                    catch 
-                    {
-                    
-                    
-                        write-host $_.Exception.Message -f Red
-                    
-                        write-host $_.Exception.ItemName -f Red
-                    
-                        write-host
-                    
-                        break
-                    
-                    }
-                    
-                    
-                }
-                    
             }
+            
+        
+            $authResult = $authReturn.Result
                     
+            # If the accesstoken is valid then create the authentication header
+        
+            if ($authResult.AccessToken)
+            {
+    
+                # Creating header for Authorization token
+    
+                $authHeader = @{
+    
+                'Content-Type'='application/json'
+    
+                'Authorization'="Bearer " + $authResult.AccessToken
+    
+                'ExpiresOn'=$authResult.ExpiresOn
+    
+                }
+    
+    
+                return $authHeader
+    
+            }
+    
+    
+            else 
+            {
+    
+    
+                Write-Host
+    
+                Write-Host "Authorization Access Token is null, please re-run authentication..." -ForegroundColor Red
+                
+                Write-Host
+    
+                break
+    
+            }
+        }
+    
+        
+        catch 
+        {                    
+                    write-host $_.Exception.Message -f Red
+            
+                    write-host $_.Exception.ItemName -f Red
+            
+                    write-host
+            
+                    break
+        }   
+        
+                   
     }        
     
 ####################################################
 
 
-function Invoke-Request
-    {
-     <#
-        .SYNOPSIS
-        Invokes Get or POST RESTmethod using $global:authheader and  $uri as an agrument 
-
-        .DESCRIPTION
-
-
-        .PARAMETER Title
-        $URI - uri that is used in request
-        -Get / -Post - switch defining the method type
-        .EXAMPLE
-
-
-        .NOTES
-
-    #>
- 
-    param(
-     [parameter(Position=0, Mandatory=$true)]
-     [string]
-     $Uri,
-     [parameter(parameterSetName="Get",Mandatory=$true)]
-     [switch]
-     $Get,
-     [parameter(parameterSetName="Post",Mandatory=$true)]
-     [switch]
-     $Post
-      )
-      
-      switch($PSCmdlet.ParameterSetName)
-      {"Get"{
-      $Answer = "$null"
-      $Answer = Invoke-RestMethod -Uri $uri –Headers $authToken –Method Get
-      Return $Answer
-      }
-      "Post"{
-      $Answer = "$null"
-      $Answer = Invoke-RestMethod -Uri $uri –Headers $authToken –Method Post  
-      Return $Answer
-      }
-      }
-    
-    
-    }
 
     ## Authentication part. Request token for your use case
  
 
     $Authroot = "https://login.windows.net/$TenantID/OAuth2/token" # or set to https://login.microsoftonline.com for graph api   
+    
     $resourceAppIdURI = "https://manage.office.com" # or set "https://graph.microsoft.com" for graph
+    
     $authority = "$authroot/$TenantID"
     
-    $global:authToken = Get-AuthToken -BySecret -ClientID $ClientID -authroot $Authroot -Secret $Secret -TenantID $TenantID -resourceAppIdURI $resourceAppIdURI
+    $global:authHeader = Get-AuthHeader -BySecret -ClientID $ClientID -authroot $Authroot -Secret $Secret -TenantID $TenantID -resourceAppIdURI $resourceAppIdURI
 
     #Initialize variables
 
     $Return = ""
+    
     $Content = ""
+    
     $result = @()                            
 
     $BaseURI = "https://manage.office.com/api/v1.0/$TenantID/activity/feed"
@@ -585,22 +357,32 @@ function Invoke-Request
 
         $URI = "$BaseURI/$SubURI"
         
-        $Return = Invoke-RestMethod -Uri $URI -Headers $authToken -Method Get 
+        $Return = Invoke-RestMethod -Uri $URI -Headers $global:authHeader -Method Get 
     
         # Write-host $Return ##Debug point. uncomment for troubleshooting
     
         if ($Return) 
         { 
-            $Return | ForEach-Object 
+            
+            foreach ($ReturnItem in $Return) 
             {
-                $Content = Invoke-RestMethod -Uri $_.ContentUri -Headers $authToken -Method get # -Verbose
+                $Content = Invoke-RestMethod -Uri $ReturnItem.ContentUri -Headers $global:authHeader -Method get # -Verbose
                     
                 $result = $result+$Content  
             }
         }
+        else 
+        {
+            Write-Host
+
+            write-host "No data for" $startday " - " $endday -BackgroundColor "Red"
+
+            Write-Host 
+
+        }
     }
     
-    Write-host "Получено событий: "$result.Count
+    Write-host "Number of events: "$result.Count
     
     ## Start parsing the output getting
 
@@ -614,17 +396,17 @@ function Invoke-Request
         
         write-host "Alert Time: "$res.CreationTime
         
-        Write-Host "Детали срабатывания:"
+        Write-Host "Detection details:"
         
         ForEach ($PolicyDet in $res.PolicyDetails)  
         {
-            Write-host "   Политика: " ,$PolicyDet.PolicyName
+            Write-host "   DLP Policy: " ,$PolicyDet.PolicyName
                 
             #  Write-host $PolicyDet.Rules ## Debug point
         
             ForEach ($PRule in $PolicyDet.Rules)
             {
-                Write-host "Причина срабатывания:"
+                Write-host "Detection trigger:"
         
                 foreach ($SensInf in $PRule.ConditionsMatched.SensitiveInformation)
                 {
@@ -636,9 +418,9 @@ function Invoke-Request
                     
                         ForEach ($Detval in $SensDet.DetectedValues) 
                         {
-                            Write-Host "   Имя сработки: "$DetVal.name
+                            Write-Host "   Detection Name: "$DetVal.name
                     
-                            Write-Host "   Контекст: "$DetVal.Value
+                            Write-Host "   Detection context: "$DetVal.Value
                         }
                     }
                 }
